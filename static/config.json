@@ -1,0 +1,7 @@
+{
+  "_comment": "Base64-encoded API credentials. Use btoa('your-value') in browser console to encode.",
+  "API_KEY": "WU9VUl9DT1VSRVNPR19BUElfS0VZX0hFUkU=",
+  "INSTITUTION_ID": "WU9VUl9JTlNUSVRVVElPTl9JRF9IRVJF",
+  "USE_MOCK_DATA": false,
+  "BASE_URL": "https://api.coursedog.com"
+}

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coursedog Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .line-clamp-1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ============================================================
+    // CONFIGURATION - Loaded from external config.json
+    // ============================================================
+    // Credentials are Base64-encoded in config.json for basic obfuscation.
+    // To encode your values: open browser console, type: btoa('your-key')
+    // ============================================================
+    let CONFIG = {
+      API_KEY: null,
+      INSTITUTION_ID: null,
+      USE_MOCK_DATA: true,
+      BASE_URL: 'https://api.coursedog.com',
+      REFRESH_INTERVAL: 300000,
+      CONFIG_LOADED: false,
+      CONFIG_ERROR: null,
+    };
+
+    async function loadConfig() {
+      try {
+        const response = await fetch('./config.json');
+        if (!response.ok) throw new Error('Failed to load config.json');
+        const encoded = await response.json();
+
+        CONFIG = {
+          API_KEY: encoded.API_KEY ? atob(encoded.API_KEY) : null,
+          INSTITUTION_ID: encoded.INSTITUTION_ID ? atob(encoded.INSTITUTION_ID) : null,
+          USE_MOCK_DATA: encoded.USE_MOCK_DATA !== false,
+          BASE_URL: encoded.BASE_URL || 'https://api.coursedog.com',
+          REFRESH_INTERVAL: 300000,
+          CONFIG_LOADED: true,
+          CONFIG_ERROR: null,
+        };
+      } catch (error) {
+        console.warn('Config load failed, using defaults:', error);
+        CONFIG.CONFIG_ERROR = error.message;
+      }
+    }
+
+    // ============================================================
+    // API CLIENT
+    // ============================================================
+    async function apiFetch(endpoint, params = {}) {
+      if (CONFIG.USE_MOCK_DATA) {
+        return { data: [], total: 0, page: 1, pageSize: 0 };
+      }
+
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, String(value));
+        }
+      });
+
+      const url = `${CONFIG.BASE_URL}/api/v1/${CONFIG.INSTITUTION_ID}/${endpoint}?${searchParams.toString()}`;
+
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${CONFIG.API_KEY}`,
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error('API fetch failed:', error);
+        throw error;
+      }
+    }
+
+    // ============================================================
+    // MOCK DATA - Remove this entire section when USE_MOCK_DATA = false
+    // ============================================================
+    const mockRooms = [
+      { id: 'room-001', name: 'Lecture Hall A', building: 'Science Building', capacity: 150, features: ['Projector', 'Whiteboard', 'Audio System'], status: 'available' },
+      { id: 'room-002', name: 'Conference Room 101', building: 'Student Union', capacity: 25, features: ['Video Conference', 'Whiteboard'], status: 'occupied' },
+      { id: 'room-003', name: 'Seminar Room B', building: 'Library', capacity: 40, features: ['Projector', 'Podium'], status: 'available' },
+      { id: 'room-004', name: 'Lab 205', building: 'Engineering Hall', capacity: 30, features: ['Computers', 'Specialized Equipment'], status: 'maintenance' },
+      { id: 'room-005', name: 'Auditorium', building: 'Arts Center', capacity: 300, features: ['Stage', 'Sound System', 'Lighting'], status: 'available' },
+      { id: 'room-006', name: 'Classroom 302', building: 'Main Hall', capacity: 35, features: ['Projector', 'Whiteboard'], status: 'occupied' },
+      { id: 'room-007', name: 'Study Room 4B', building: 'Library', capacity: 8, features: ['Whiteboard', 'Quiet Space'], status: 'available' },
+      { id: 'room-008', name: 'Meeting Room C', building: 'Administration', capacity: 15, features: ['Video Conference'], status: 'available' },
+    ];
+
+    const mockEvents = [
+      { id: 'evt-001', title: 'Computer Science Department Meeting', description: 'Monthly faculty meeting', startDate: new Date(Date.now() + 86400000).toISOString(), endDate: new Date(Date.now() + 86400000 + 7200000).toISOString(), roomId: 'room-001', roomName: 'Lecture Hall A', organizer: 'Dr. Sarah Johnson', status: 'approved', attendees: 25 },
+      { id: 'evt-002', title: 'Student Club Fair', description: 'Annual recruitment event', startDate: new Date(Date.now() + 172800000).toISOString(), endDate: new Date(Date.now() + 172800000 + 14400000).toISOString(), roomId: 'room-005', roomName: 'Auditorium', organizer: 'Student Activities Office', status: 'approved', attendees: 200 },
+      { id: 'evt-003', title: 'Research Presentation: AI Ethics', description: 'Guest lecture on AI ethics', startDate: new Date(Date.now() + 43200000).toISOString(), endDate: new Date(Date.now() + 43200000 + 5400000).toISOString(), roomId: 'room-003', roomName: 'Seminar Room B', organizer: 'Prof. Michael Chen', status: 'pending', attendees: 35 },
+      { id: 'evt-004', title: 'Alumni Networking Event', description: 'Networking for recent grads', startDate: new Date(Date.now() + 259200000).toISOString(), endDate: new Date(Date.now() + 259200000 + 10800000).toISOString(), roomId: 'room-002', roomName: 'Conference Room 101', organizer: 'Career Services', status: 'approved', attendees: 20 },
+    ];
+
+    const mockCourses = [
+      { id: 'crs-001', code: 'CS 101', title: 'Introduction to Computer Science', instructor: 'Dr. Sarah Johnson', schedule: 'MWF 9:00-10:00 AM', roomId: 'room-001', roomName: 'Lecture Hall A', building: 'Science Building', credits: 3, enrollment: 142, capacity: 150, status: 'active' },
+      { id: 'crs-002', code: 'MATH 201', title: 'Calculus II', instructor: 'Prof. Robert Williams', schedule: 'TTh 11:00-12:30 PM', roomId: 'room-006', roomName: 'Classroom 302', building: 'Main Hall', credits: 4, enrollment: 28, capacity: 35, status: 'active' },
+      { id: 'crs-003', code: 'ENG 150', title: 'Academic Writing', instructor: 'Dr. Emily Parker', schedule: 'MWF 2:00-3:00 PM', roomId: 'room-003', roomName: 'Seminar Room B', building: 'Library', credits: 3, enrollment: 22, capacity: 40, status: 'active' },
+      { id: 'crs-004', code: 'PHYS 301', title: 'Quantum Mechanics', instructor: 'Prof. David Lee', schedule: 'TTh 2:00-3:30 PM', roomId: 'room-004', roomName: 'Lab 205', building: 'Engineering Hall', credits: 4, enrollment: 18, capacity: 30, status: 'active' },
+    ];
+
+    function filterRooms(filters) {
+      return mockRooms.filter((room) => {
+        if (filters.status && room.status !== filters.status) return false;
+        if (filters.building && !room.building.toLowerCase().includes(filters.building.toLowerCase())) return false;
+        if (filters.room && !room.name.toLowerCase().includes(filters.room.toLowerCase())) return false;
+        if (filters.query) {
+          const query = filters.query.toLowerCase();
+          if (!room.name.toLowerCase().includes(query) && !room.building.toLowerCase().includes(query)) return false;
+        }
+        return true;
+      });
+    }
+
+    function filterEvents(filters) {
+      return mockEvents.filter((event) => {
+        if (filters.status && event.status !== filters.status) return false;
+        if (filters.query) {
+          const query = filters.query.toLowerCase();
+          if (!event.title.toLowerCase().includes(query)) return false;
+        }
+        return true;
+      });
+    }
+
+    function filterCourses(filters) {
+      return mockCourses.filter((course) => {
+        if (filters.status && course.status !== filters.status) return false;
+        if (filters.building && !course.building?.toLowerCase().includes(filters.building.toLowerCase())) return false;
+        if (filters.query) {
+          const query = filters.query.toLowerCase();
+          if (!course.code.toLowerCase().includes(query) && !course.title.toLowerCase().includes(query)) return false;
+        }
+        return true;
+      });
+    }
+
+    // ============================================================
+    // NLP PARSER
+    // ============================================================
+    const STATUS_MAP = {
+      pending: ['pending', 'awaiting', 'waiting'],
+      approved: ['approved', 'confirmed', 'accepted', 'active'],
+      rejected: ['rejected', 'denied', 'declined'],
+      available: ['available', 'free', 'open'],
+      occupied: ['occupied', 'busy', 'in use'],
+      maintenance: ['maintenance', 'repair'],
+    };
+
+    const ENTITY_MAP = {
+      rooms: ['room', 'rooms', 'space', 'classroom'],
+      events: ['event', 'events', 'meeting'],
+      courses: ['course', 'courses', 'class'],
+    };
+
+    const BUILDINGS = ['student union', 'library', 'science building', 'engineering hall', 'arts center', 'administration', 'main hall'];
+
+    function parseQuery(query) {
+      const q = query.toLowerCase();
+      const filters = {};
+      let entity = 'unknown';
+
+      // Detect entity
+      for (const [e, keywords] of Object.entries(ENTITY_MAP)) {
+        if (keywords.some(k => q.includes(k))) { entity = e; break; }
+      }
+
+      // Detect status
+      for (const [status, keywords] of Object.entries(STATUS_MAP)) {
+        if (keywords.some(k => q.includes(k))) { filters.status = status; break; }
+      }
+
+      // Detect building
+      for (const building of BUILDINGS) {
+        if (q.includes(building)) {
+          filters.building = building.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          break;
+        }
+      }
+
+      // Fallback
+      if (Object.keys(filters).length === 0 && q.trim()) filters.query = q.trim();
+
+      return { filters, entity: entity === 'unknown' ? 'rooms' : entity };
+    }
+
+    // ============================================================
+    // ICONS (Inline SVG)
+    // ============================================================
+    const Icon = ({ size = 24, className = '', children }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+
+    const SearchIcon = ({ size }) => <Icon size={size}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Icon>;
+    const BuildingIcon = ({ size }) => <Icon size={size}><path d="M10 12h4"/><path d="M10 8h4"/><path d="M6 20V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M2 20h20"/></Icon>;
+    const CalendarIcon = ({ size }) => <Icon size={size}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
+    const BookIcon = ({ size }) => <Icon size={size}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>;
+    const MapPinIcon = ({ size }) => <Icon size={size}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Icon>;
+    const UsersIcon = ({ size }) => <Icon size={size}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></Icon>;
+    const XIcon = ({ size }) => <Icon size={size}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>;
+
+    // ============================================================
+    // COMPONENTS
+    // ============================================================
+    const { useState, useEffect, useCallback } = React;
+
+    function StatusBadge({ status }) {
+      const config = {
+        pending: 'bg-yellow-100 text-yellow-800',
+        approved: 'bg-green-100 text-green-800',
+        active: 'bg-green-100 text-green-800',
+        available: 'bg-green-100 text-green-800',
+        occupied: 'bg-red-100 text-red-800',
+        maintenance: 'bg-orange-100 text-orange-800',
+        cancelled: 'bg-gray-100 text-gray-800',
+      };
+      const labels = {
+        pending: 'Pending', approved: 'Approved', active: 'Active',
+        available: 'Available', occupied: 'Occupied', maintenance: 'Maintenance', cancelled: 'Cancelled',
+      };
+      return <span className={`inline-flex items-center px-2.5 py-1 text-sm font-medium rounded-full ${config[status] || 'bg-gray-100 text-gray-800'}`}>{labels[status] || status}</span>;
+    }
+
+    function DataTable({ columns, data, loading, emptyMessage, keyExtractor }) {
+      if (loading) return <div className="flex items-center justify-center py-12 text-gray-500">Loading...</div>;
+      if (data.length === 0) return <div className="flex items-center justify-center py-12 text-gray-500">{emptyMessage}</div>;
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+              <tr>{columns.map(c => <th key={c.key} className="px-4 py-3 font-semibold" style={{ width: c.width }}>{c.header}</th>)}</tr>
+            </thead>
+            <tbody>
+              {data.map(item => (
+                <tr key={keyExtractor(item)} className="bg-white border-b hover:bg-gray-50">
+                  {columns.map(c => <td key={c.key} className="px-4 py-3">{c.render ? c.render(item) : item[c.key]}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    function useGlobalFilters() {
+      const [filters, setFilters] = useState({ events: {}, courses: {}, rooms: {}, activeEntity: 'rooms' });
+      const setActiveEntity = (e) => setFilters(p => ({ ...p, activeEntity: e }));
+      const applyFilters = (entity, f) => setFilters(p => ({ ...p, [entity]: f, activeEntity: entity }));
+      const clearFilters = (entity) => setFilters(p => ({ ...p, [entity]: {} }));
+      const clearSpecific = (entity, key) => setFilters(p => ({ ...p, [entity]: { ...p[entity], [key]: undefined } }));
+      return { filters, activeEntity: filters.activeEntity, setActiveEntity, applyFilters, clearFilters, clearSpecific, getActive: () => filters[filters.activeEntity] };
+    }
+
+    function Header({ activeEntity, onChange }) {
+      const tabs = [
+        { id: 'rooms', label: 'Rooms', Icon: BuildingIcon },
+        { id: 'events', label: 'Events', Icon: CalendarIcon },
+        { id: 'courses', label: 'Courses', Icon: BookIcon },
+      ];
+      return (
+        <header className="bg-white shadow-sm border-b">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <BuildingIcon size={20} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">Coursedog</h1>
+                  <p className="text-xs text-gray-500">Command Center</p>
+                </div>
+              </div>
+              <nav className="flex items-center gap-1">
+                {tabs.map(({ id, label, Icon }) => (
+                  <button key={id} onClick={() => onChange(id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeEntity === id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+                    <Icon size={16} />{label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    function SearchBar({ onSearch }) {
+      const [query, setQuery] = useState('');
+      const [preview, setPreview] = useState(null);
+
+      const handleChange = (e) => {
+        const val = e.target.value;
+        setQuery(val);
+        if (val.trim()) {
+          const result = parseQuery(val.trim());
+          const count = Object.values(result.filters).filter(v => v).length;
+          setPreview({ ...result, count });
+        } else {
+          setPreview(null);
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!query.trim()) return;
+        const result = parseQuery(query.trim());
+        onSearch(result.entity, result.filters);
+      };
+
+      return (
+        <div className="w-full">
+          <form onSubmit={handleSubmit} className="w-full">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <SearchIcon size={20} />
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={handleChange}
+                placeholder="Search rooms, events, or courses..."
+                className="block w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+          </form>
+          {preview && preview.count > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-500">Detected:</span>
+              {Object.entries(preview.filters).map(([k, v]) => v ? (
+                <span key={k} className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded border border-blue-100">{k}: {String(v)}</span>
+              ) : null)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function FilterChips({ filters, onClear, onClearAll }) {
+      const active = Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '');
+      if (active.length === 0) return null;
+      return (
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <span className="text-sm font-medium text-gray-600">{active.length} Active:</span>
+          {active.map(([key, value]) => (
+            <span key={key} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-sm rounded-full border border-blue-200">
+              {key}: <span className="capitalize">{String(value)}</span>
+              <button onClick={() => onClear(key)} className="p-0.5 hover:bg-blue-200 rounded-full"><XIcon size={14} /></button>
+            </span>
+          ))}
+          <button onClick={onClearAll} className="text-sm text-gray-500 hover:text-red-600">Clear all</button>
+        </div>
+      );
+    }
+
+    function RoomsWidget({ filters }) {
+      const [data, setData] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        setLoading(true);
+        if (CONFIG.USE_MOCK_DATA) {
+          // Using mock data
+          setTimeout(() => { setData(filterRooms(filters)); setLoading(false); }, 300);
+        } else {
+          // Using real API - uncomment when ready
+          // apiFetch('rooms', filters).then(res => { setData(res.data); setLoading(false); });
+          setData([]); setLoading(false);
+        }
+      }, [filters]);
+
+      const columns = [
+        { key: 'name', header: 'Room', width: '30%', render: (r) => <div><div className="font-medium">{r.name}</div><div className="text-xs text-gray-500">{r.features?.slice(0, 3).join(', ')}</div></div> },
+        { key: 'building', header: 'Building', width: '25%', render: (r) => <div className="flex items-center gap-1 text-gray-600"><MapPinIcon size={14} />{r.building}</div> },
+        { key: 'capacity', header: 'Capacity', width: '15%', render: (r) => <div className="flex items-center gap-1 text-gray-600"><UsersIcon size={14} />{r.capacity}</div> },
+        { key: 'status', header: 'Status', width: '15%', render: (r) => <StatusBadge status={r.status} /> },
+      ];
+
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold">Rooms</h2>
+              {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+            </div>
+          </div>
+          <DataTable columns={columns} data={data} loading={loading} emptyMessage="No rooms found" keyExtractor={r => r.id} />
+        </div>
+      );
+    }
+
+    function EventsWidget({ filters }) {
+      const [data, setData] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        setLoading(true);
+        if (CONFIG.USE_MOCK_DATA) {
+          setTimeout(() => { setData(filterEvents(filters)); setLoading(false); }, 300);
+        } else {
+          // apiFetch('events', filters).then(res => { setData(res.data); setLoading(false); });
+          setData([]); setLoading(false);
+        }
+      }, [filters]);
+
+      const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      const columns = [
+        { key: 'title', header: 'Event', width: '35%', render: (e) => <div><div className="font-medium">{e.title}</div><div className="text-xs text-gray-500">{e.description}</div></div> },
+        { key: 'date', header: 'Date', width: '25%', render: (e) => <div className="flex items-center gap-1 text-gray-600"><CalendarIcon size={14} /><span className="text-sm">{formatDate(e.startDate)}</span></div> },
+        { key: 'organizer', header: 'Organizer', width: '20%', render: (e) => <span className="text-sm text-gray-600">{e.organizer}</span> },
+        { key: 'status', header: 'Status', width: '15%', render: (e) => <StatusBadge status={e.status} /> },
+      ];
+
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold">Events</h2>
+              {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+            </div>
+          </div>
+          <DataTable columns={columns} data={data} loading={loading} emptyMessage="No events found" keyExtractor={e => e.id} />
+        </div>
+      );
+    }
+
+    function CoursesWidget({ filters }) {
+      const [data, setData] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        setLoading(true);
+        if (CONFIG.USE_MOCK_DATA) {
+          setTimeout(() => { setData(filterCourses(filters)); setLoading(false); }, 300);
+        } else {
+          // apiFetch('courses', filters).then(res => { setData(res.data); setLoading(false); });
+          setData([]); setLoading(false);
+        }
+      }, [filters]);
+
+      const columns = [
+        { key: 'code', header: 'Course', width: '20%', render: (c) => <div><div className="font-medium">{c.code}</div><div className="text-xs text-gray-500">{c.credits} credits</div></div> },
+        { key: 'title', header: 'Title', width: '25%', render: (c) => <div className="font-medium line-clamp-1">{c.title}</div> },
+        { key: 'instructor', header: 'Instructor', width: '20%', render: (c) => <span className="text-sm text-gray-600">{c.instructor}</span> },
+        { key: 'schedule', header: 'Schedule', width: '20%', render: (c) => <span className="text-sm text-gray-600">{c.schedule}</span> },
+        { key: 'status', header: 'Status', width: '15%', render: (c) => <StatusBadge status={c.status} /> },
+      ];
+
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold">Courses</h2>
+              {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+            </div>
+          </div>
+          <DataTable columns={columns} data={data} loading={loading} emptyMessage="No courses found" keyExtractor={c => c.id} />
+        </div>
+      );
+    }
+
+    // ============================================================
+    // MAIN APP
+    // ============================================================
+    function App() {
+      const [configReady, setConfigReady] = useState(false);
+      const { filters, activeEntity, setActiveEntity, applyFilters, clearFilters, clearSpecific, getActive } = useGlobalFilters();
+
+      useEffect(() => {
+        loadConfig().then(() => setConfigReady(true));
+      }, []);
+
+      const handleSearch = (entity, f) => applyFilters(entity, f);
+      const handleClear = (key) => clearSpecific(activeEntity, key);
+      const handleClearAll = () => clearFilters(activeEntity);
+      const activeFilters = getActive();
+
+      return (
+        <div className="min-h-screen bg-gray-100">
+          <Header activeEntity={activeEntity} onChange={setActiveEntity} />
+          <main className="container mx-auto px-4 py-6">
+            <div className="mb-6">
+              <SearchBar onSearch={handleSearch} />
+              <FilterChips filters={activeFilters} onClear={handleClear} onClearAll={handleClearAll} />
+            </div>
+            <div className="space-y-6">
+              {activeEntity === 'rooms' && <RoomsWidget filters={filters.rooms} />}
+              {activeEntity === 'events' && <EventsWidget filters={filters.events} />}
+              {activeEntity === 'courses' && <CoursesWidget filters={filters.courses} />}
+            </div>
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="text-sm text-gray-500 mb-1">Active Filters</div>
+                <div className="text-2xl font-bold text-gray-900">{Object.values(activeFilters).filter(v => v !== undefined && v !== '').length}</div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="text-sm text-gray-500 mb-1">Current View</div>
+                <div className="text-2xl font-bold text-gray-900 capitalize">{activeEntity}</div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="text-sm text-gray-500 mb-1">Mode</div>
+                <div className="text-2xl font-bold text-green-600">{CONFIG.USE_MOCK_DATA ? 'Demo' : 'Live'}</div>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

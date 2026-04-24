@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coursedog Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .line-clamp-1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="root"></div>
+
+  <!-- Data Layer -->
+  <script src="lib/mockData.js"></script>
+  <script src="lib/nlpMappings.js"></script>
+  <script src="lib/nlpParser.js"></script>
+  <script src="lib/icons.js"></script>
+
+  <!-- Hooks -->
+  <script src="hooks/useGlobalFilters.js" type="text/babel"></script>
+
+  <!-- UI Components -->
+  <script src="components/LoadingSpinner.js" type="text/babel"></script>
+  <script src="components/StatusBadge.js" type="text/babel"></script>
+  <script src="components/DataTable.js" type="text/babel"></script>
+
+  <!-- Layout Components -->
+  <script src="components/Header.js" type="text/babel"></script>
+
+  <!-- Search Components -->
+  <script src="components/SearchBar.js" type="text/babel"></script>
+  <script src="components/FilterChips.js" type="text/babel"></script>
+
+  <!-- Widget Components -->
+  <script src="components/RoomsWidget.js" type="text/babel"></script>
+  <script src="components/EventsWidget.js" type="text/babel"></script>
+  <script src="components/CoursesWidget.js" type="text/babel"></script>
+
+  <!-- App Entry -->
+  <script src="app.js" type="text/babel"></script>
+</body>
+</html>
