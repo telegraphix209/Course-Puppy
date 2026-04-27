@@ -374,19 +374,40 @@
       );
     }
 
+    function normalizeRoom(r) {
+      return {
+        id: r.id || r._id || r.roomId || '',
+        name: r.name || r.roomName || r.label || r.title || 'Unnamed Room',
+        building: r.building || r.buildingName || r.location || r.campus || '-',
+        capacity: r.capacity || r.maxCapacity || r.seats || 0,
+        features: Array.isArray(r.features) ? r.features : (r.amenities || r.equipment || []),
+        status: r.status || r.availability || r.state || 'available',
+      };
+    }
+
     function RoomsWidget({ filters }) {
       const [data, setData] = useState([]);
       const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
 
       useEffect(() => {
         setLoading(true);
+        setError(null);
         if (CONFIG.USE_MOCK_DATA) {
-          // Using mock data
           setTimeout(() => { setData(filterRooms(filters)); setLoading(false); }, 300);
         } else {
-          // Using real API - uncomment when ready
-          // apiFetch('rooms', filters).then(res => { setData(res.data); setLoading(false); });
-          setData([]); setLoading(false);
+          apiFetch('rooms', filters)
+            .then(res => {
+              const normalized = (res.data || []).map(normalizeRoom);
+              setData(normalized);
+              setLoading(false);
+            })
+            .catch(err => {
+              console.error('Rooms API error:', err);
+              setError(err.message);
+              setData(filterRooms(filters));
+              setLoading(false);
+            });
         }
       }, [filters]);
 
@@ -403,6 +424,7 @@
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">Rooms</h2>
               {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+              {error && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full" title={error}>API Error</span>}
             </div>
           </div>
           <DataTable columns={columns} data={data} loading={loading} emptyMessage="No rooms found" keyExtractor={r => r.id} />
@@ -410,17 +432,44 @@
       );
     }
 
+    function normalizeEvent(e) {
+      return {
+        id: e.id || e._id || e.eventId || '',
+        title: e.title || e.name || e.eventName || e.subject || 'Untitled Event',
+        description: e.description || e.desc || e.body || e.notes || '',
+        startDate: e.startDate || e.start || e.startTime || e.beginDate || new Date().toISOString(),
+        endDate: e.endDate || e.end || e.endTime || e.finishDate || new Date().toISOString(),
+        roomId: e.roomId || e.room_id || e.roomID || e.spaceId || '',
+        roomName: e.roomName || e.room || e.space || e.location || '-',
+        organizer: e.organizer || e.host || e.creator || e.organizerName || e.requestor || '-',
+        status: e.status || e.state || e.approvalStatus || 'pending',
+        attendees: e.attendees || e.attendeeCount || e.guestCount || e.capacity || 0,
+      };
+    }
+
     function EventsWidget({ filters }) {
       const [data, setData] = useState([]);
       const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
 
       useEffect(() => {
         setLoading(true);
+        setError(null);
         if (CONFIG.USE_MOCK_DATA) {
           setTimeout(() => { setData(filterEvents(filters)); setLoading(false); }, 300);
         } else {
-          // apiFetch('events', filters).then(res => { setData(res.data); setLoading(false); });
-          setData([]); setLoading(false);
+          apiFetch('events', filters)
+            .then(res => {
+              const normalized = (res.data || []).map(normalizeEvent);
+              setData(normalized);
+              setLoading(false);
+            })
+            .catch(err => {
+              console.error('Events API error:', err);
+              setError(err.message);
+              setData(filterEvents(filters));
+              setLoading(false);
+            });
         }
       }, [filters]);
 
@@ -439,6 +488,7 @@
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">Events</h2>
               {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+              {error && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full" title={error}>API Error</span>}
             </div>
           </div>
           <DataTable columns={columns} data={data} loading={loading} emptyMessage="No events found" keyExtractor={e => e.id} />
@@ -446,17 +496,46 @@
       );
     }
 
+    function normalizeCourse(c) {
+      return {
+        id: c.id || c._id || c.courseId || '',
+        code: c.code || c.courseCode || c.number || c.catalogNumber || c.section || '-',
+        title: c.title || c.name || c.courseName || c.subject || 'Untitled Course',
+        instructor: c.instructor || c.instructorName || c.professor || c.faculty || c.teacher || '-',
+        schedule: c.schedule || c.meetingPattern || c.meetingTimes || c.time || c.days || '-',
+        roomId: c.roomId || c.room_id || c.spaceId || '',
+        roomName: c.roomName || c.room || c.location || '-',
+        building: c.building || c.buildingName || c.campus || '-',
+        credits: c.credits || c.creditHours || c.units || 0,
+        enrollment: c.enrollment || c.enrolled || c.currentEnrollment || 0,
+        capacity: c.capacity || c.maxEnrollment || c.seats || 0,
+        status: c.status || c.state || c.courseStatus || 'active',
+      };
+    }
+
     function CoursesWidget({ filters }) {
       const [data, setData] = useState([]);
       const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
 
       useEffect(() => {
         setLoading(true);
+        setError(null);
         if (CONFIG.USE_MOCK_DATA) {
           setTimeout(() => { setData(filterCourses(filters)); setLoading(false); }, 300);
         } else {
-          // apiFetch('courses', filters).then(res => { setData(res.data); setLoading(false); });
-          setData([]); setLoading(false);
+          apiFetch('courses', filters)
+            .then(res => {
+              const normalized = (res.data || []).map(normalizeCourse);
+              setData(normalized);
+              setLoading(false);
+            })
+            .catch(err => {
+              console.error('Courses API error:', err);
+              setError(err.message);
+              setData(filterCourses(filters));
+              setLoading(false);
+            });
         }
       }, [filters]);
 
@@ -474,6 +553,7 @@
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">Courses</h2>
               {CONFIG.USE_MOCK_DATA && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Demo Data</span>}
+              {error && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full" title={error}>API Error</span>}
             </div>
           </div>
           <DataTable columns={columns} data={data} loading={loading} emptyMessage="No courses found" keyExtractor={c => c.id} />
